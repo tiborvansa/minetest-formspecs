@@ -1,17 +1,40 @@
-ActiveFormspecs Mod v2.0
+ActiveFormspecs Mod v2.1
 By Leslie E. Krause
 
-https://github.com/sorcerykid
+https://forum.minetest.net/viewtopic.php?f=9&t=19303
 
 Revision history
 ----------------------
 
-v1.0a (15-Dec-2016) -- initial version within default mod
-v1.1b (16-Dec-2016) -- added better comments
-v1.2b (18-Dec-2016) -- renamed public methods
-v1.3b (04-Jan-2017) -- fixed logic of quit event to require valid session
-v1.4b (26-Jul-2017) -- added method to update formspec and maintain session
-v2.0  (24-Dec-2017) -- separated all routines into new mod for public release
+Version 1.0a (15-Dec-2016)
+  - initial version within default mod
+
+Version 1.1b (16-Dec-2016)
+  - added better comments
+
+Version 1.2b (18-Dec-2016)
+  - renamed public methods
+
+Version 1.3b (04-Jan-2017)
+  - fixed logic of quit event to require valid session
+
+Version 1.4b (26-Jul-2017)
+  - added method to update formspec and maintain session
+
+Version 2.0 (24-Dec-2017)
+  - separated all routines into new mod for public release
+
+Version 2.1 (08-Jan-2018)
+  - various code refactoring and better comments
+  - introduced password hashing of form names
+  - improved sanity checks during form submission
+  - fully reworked parsing of hidden elements
+  - ensured hidden elements are always stripped
+  - gave hidden elements default-state behavior
+  - localized old node registration functions
+  - included player object within form table
+  - added signal handling on formspec termination
+  - added support for callbacks in node overrides
 
 License of source code
 ----------------------
