@@ -1,5 +1,5 @@
 --------------------------------------------------------
--- Minetest :: ActiveFormspecs Mod v2.1 (formspecs)
+-- Minetest :: ActiveFormspecs Mod v2.2 (formspecs)
 --
 -- See README.txt for licensing and release notes.
 -- Copyright (c) 2016-2018, Leslie Ellen Krause
@@ -13,7 +13,7 @@ minetest.FORMSPEC_SIGEXIT = true	-- player clicked exit button or pressed esc ke
 minetest.FORMSPEC_SIGQUIT = 1		-- player logged off
 minetest.FORMSPEC_SIGKILL = 2		-- player was killed
 minetest.FORMSPEC_SIGTERM = 3		-- server is shutting down
-minetest.FORMSPEC_SIGFORM = 4		-- closure requested
+minetest.FORMSPEC_SIGPROC = 4		-- programmatic closure
 minetest.FORMSPEC_SIGTIME = 5		-- timeout reached
 
 local afs = { }		-- obtain localized, protected namespace
@@ -64,7 +64,7 @@ minetest.register_on_player_receive_fields( function( player, formname, fields )
 	
 	form.proc( form.meta, form.player, fields )
 
-	-- revoke current session when formspec is closed
+	-- revoke current session when closing formspec
 	if fields.quit then
 		afs.forms[ player:get_player_name( ) ] = nil
 	end
@@ -73,30 +73,38 @@ end )
 -----------------------------------------------------------------
 -- open detached formspec
 -----------------------------------------------------------------
--- possibly change order of params and accept player_name instead?
--- minetest.create_form = function ( player_name, formspec, meta, proc )
 
-minetest.create_form = function ( meta, player, formspec, proc )
-	local form = { }
-
+minetest.create_form = function ( meta, player_name, formspec, on_close )
 	-- short circuit whenever required params are missing
-	if not player or not formspec or not proc then return end
+	if not player_name or not formspec or not on_close then return end
 
-	-- invoke new session when formspec is opened
+	if type( player_name ) ~= "string" then
+		player_name = player_name:get_player_name( )
+	end
+
+	local form = afs.forms[ player_name ]
+
+	-- signal previous callback before formspec closure
+	if form then
+		form.proc( form.meta, form.player, { quit = minetest.FORMSPEC_SIGPROC } )
+	end
+
+	-- invoke new session when opening formspec
 	afs.session_id = afs.session_id + 1
 
-	form.player = player
-	form.name = minetest.get_password_hash( player:get_player_name( ), afs.session_seed + afs.session_id )
-	form.proc = proc
+	form = { }
+	form.player = minetest.get_player_by_name( player_name )
+	form.name = minetest.get_password_hash( player_name, afs.session_seed + afs.session_id )
+	form.proc = on_close
 	form.meta = meta or { }
 	form.timer = 0
 
 	-- public methods for use by callbacks (still wip)
 	form.update = function ( self, formspec )
-		minetest.update_form( self.player, formspec )
+		minetest.update_form( player_name, formspec )
 	end
 	form.destroy = function ( self )
-		minetest.destroy_form( self.player )
+		minetest.destroy_form( player_name )
 	end
 
 	-- hidden elements only provide default, initial values 
@@ -119,8 +127,8 @@ minetest.create_form = function ( meta, player, formspec, proc )
 		return ""	-- strip hidden elements prior to showing formspec
 	end )
 
-	afs.forms[ player:get_player_name( ) ] = form
-	minetest.show_formspec( player:get_player_name( ), form.name, formspec )
+	afs.forms[ player_name ] = form
+	minetest.show_formspec( player_name, form.name, formspec )
 
 	return form.name
 end
@@ -130,7 +138,7 @@ end
 -----------------------------------------------------------------
 
 minetest.update_form = function ( player, formspec )
-	local pname = player:get_player_name( )
+	local pname = type( player ) == "string" and player or player:get_player_name( )
 	local form = afs.forms[ pname ]
 
 	minetest.show_formspec( pname, form.name, formspec )
@@ -141,12 +149,12 @@ end
 -----------------------------------------------------------------
 
 minetest.destroy_form = function ( player )
-	local pname = player:get_player_name( )
+	local pname = type( player ) == "string" and player or player:get_player_name( )
 	local form = afs.forms[ pname ]
 
 	minetest.close_formspec( pname, form.name )
 
-	form.proc( form.meta, player, { quit = minetest.FORMSPEC_SIGFORM } )
+	form.proc( form.meta, form.player, { quit = minetest.FORMSPEC_SIGPROC } )
 	afs.forms[ pname ] = nil
 end
 
@@ -159,7 +167,7 @@ minetest.register_on_leaveplayer( function( player, is_timeout )
 	local form = afs.forms[ pname ]
 
 	if form then
-		form.proc( form.meta, player, { quit = minetest.FORMSPEC_SIGQUIT } )
+		form.proc( form.meta, form.player, { quit = minetest.FORMSPEC_SIGQUIT } )
 		afs.forms[ pname ] = nil
 	end
 end )
@@ -169,7 +177,7 @@ minetest.register_on_dieplayer( function( player )
 	local form = afs.forms[ pname ]
 
 	if form then
-		form.proc( form.meta, player, { quit = minetest.FORMSPEC_SIGKILL } )
+		form.proc( form.meta, form.player, { quit = minetest.FORMSPEC_SIGKILL } )
 		afs.forms[ pname ] = nil
 	end
 end )

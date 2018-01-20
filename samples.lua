@@ -26,16 +26,6 @@ end
 
 minetest.override_item( "nyancat:nyancat", {
 	description = "System Monitor",
-	tiles = { "nyancat_side.png", "nyancat_side.png", "nyancat_side.png",
-                "nyancat_side.png", "nyancat_back.png", "nyancat_front.png" },
-	paramtype2 = "facedir",
-	paramtype = "light",
-	light_source = default.LIGHT_MAX - 1,
-	sunlight_propagates = true,
-	walkable = true,
-	is_ground_content = false,
-	groups = { cracky = 2 },
-	sounds = default.node_sound_glass_defaults( ),
         
 	on_open = function( meta, player )
 		local player_name = player:get_player_name( )
