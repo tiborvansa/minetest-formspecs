@@ -1,4 +1,4 @@
-ActiveFormspecs Mod v2.2
+ActiveFormspecs Mod v2.3
 By Leslie E. Krause
 
 ActiveFormspecs is a self-contained API that provides secure session tracking, session-
@@ -49,6 +49,16 @@ Version 2.2 (19-Jan-2018)
   - added signal for programmatic formspec closure
   - ensured callbacks are notified of session resets
   - renamed some local variables to improve clarity
+
+Version 2.3 (28-Jan-2018)
+  - corrected erroneous value of formspec exit signal
+  - removed two experimental form session methods
+  - included timestamp and origin within form table
+  - added form session validation on destroy and update
+  - introduced form timers with start and stop methods
+  - created routine to notify callbacks of timeout
+  - added support for internal statistical tracking
+  - added chat command to view form session summary
 
 Installation
 ----------------------
