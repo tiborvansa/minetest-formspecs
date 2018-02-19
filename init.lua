@@ -1,5 +1,5 @@
 --------------------------------------------------------
--- Minetest :: ActiveFormspecs Mod v2.3 (formspecs)
+-- Minetest :: ActiveFormspecs Mod v2.4 (formspecs)
 --
 -- See README.txt for licensing and release notes.
 -- Copyright (c) 2016-2018, Leslie Ellen Krause
@@ -22,7 +22,6 @@ afs.forms = { }
 afs.timers = { }
 afs.session_id = 0
 afs.session_seed = math.random( 0, 65535 )
-afs.rtime = 1.0
 
 afs.stats = { active = 0, opened = 0, closed = 0 }
 
@@ -40,37 +39,53 @@ end
 -- trigger callbacks at set intervals within timer queue
 -----------------------------------------------------------------
 
-minetest.register_globalstep( function( dtime )
-	afs.rtime = afs.rtime - dtime
+do
+	-- localize needed object references for efficiency
+	local get_us_time = minetest.get_us_time
+	local timers = afs.timers
+	local t_cur = get_us_time( )
+	local t_off = -t_cur
 
-	-- rate-limiting of timers to once per second seems optimal
+	-- step monotonic clock with graceful 32-bit overflow
+	local step_clock = function( )
+		local t_new = get_us_time( )
 
-	if afs.rtime <= 0.0 then
-		local idx = #afs.timers
+		if t_new < t_cur then
+			t_off = t_off + 4294967290
+		end
 
-		local curtime = os.time( )
+		t_cur = t_new
+		return t_off + t_new
+	end
+	afs.get_uptime = function( )
+		return ( t_off + t_cur ) / 1000000
+	end
 
+	minetest.register_globalstep( function( dtime )
+		local curtime = step_clock( ) / 1000000
+		local idx = #timers
+
+		-- iterate through table in reverse order to allow removal
 		while idx > 0 do
-			local self = afs.timers[ idx ]
+			local self = timers[ idx ]
 
 			if curtime >= self.exptime then
 				self.counter = self.counter + 1
+				self.overrun = curtime - self.exptime
 				self.exptime = curtime + self.form.timeout
 
-				self.overrun = -afs.rtime
-				self.form.newtime = curtime
+				self.form.newtime = math.floor( curtime )
 				self.form.on_close( self.form.meta, self.form.player, { quit = minetest.FORMSPEC_SIGTIME } )
-				self.overrun = 0.0
-        	        end
-			idx = idx - 1
-	        end
 
-		afs.rtime = 1.0
-	end
-end )
+				self.overrun = 0.0
+      		        	end
+			idx = idx - 1
+        	end
+	end )
+end
 
 -----------------------------------------------------------------
--- create node-dependent formspecs during registration
+-- override node registrations for attached formspecs
 -----------------------------------------------------------------
 
 local on_rightclick = function( pos, node, player )
@@ -103,7 +118,7 @@ minetest.override_item = function ( name, def )
 end
 
 -----------------------------------------------------------------
--- invoke callback for detached formspec with state table
+-- trigger callbacks during formspec events
 -----------------------------------------------------------------
 
 minetest.register_on_player_receive_fields( function( player, formname, fields )
@@ -126,7 +141,7 @@ minetest.register_on_player_receive_fields( function( player, formname, fields )
 end )
 
 -----------------------------------------------------------------
--- open detached formspec
+-- expose timer functionality within a helper object
 -----------------------------------------------------------------
 
 minetest.get_form_timer = function ( player_name, form_name )
@@ -136,11 +151,11 @@ minetest.get_form_timer = function ( player_name, form_name )
 	if not form or form_name and form_name ~= form.name then return end
 
 	self.start = function ( timeout )
-		if not form.timeout and timeout > 0 then
-			local curtime = os.time( )
+		if not form.timeout and timeout >= 0.5 then
+			local curtime = afs.get_uptime( )
 
 			form.timeout = timeout
-			table.insert( afs.timers, { form = form, counter = 0, oldtime = curtime, exptime = curtime + math.ceil( timeout ), overrun = 0.0 } )
+			table.insert( afs.timers, { form = form, counter = 0, oldtime = curtime, exptime = curtime + timeout, overrun = 0.0 } )
 		end
 	end
 	self.stop = function ( )
@@ -155,9 +170,24 @@ minetest.get_form_timer = function ( player_name, form_name )
 			end
 		end
 	end
+	self.get_state = function ( )
+		if not form.timeout then return end
+
+		for i, v in ipairs( afs.timers ) do
+			local curtime = afs.get_uptime( )
+
+			if v.form == form then
+				return { elapsed = curtime - v.oldtime, remain = v.exptime - curtime, overrun = v.overrun, counter = v.counter }
+			end
+		end
+	end
 
 	return self
 end
+
+-----------------------------------------------------------------
+-- open detached formspec with session-based state table
+-----------------------------------------------------------------
 
 minetest.create_form = function ( meta, player_name, formspec, on_close )
 	-- short circuit whenever required params are missing
@@ -169,7 +199,7 @@ minetest.create_form = function ( meta, player_name, formspec, on_close )
 
 	local form = afs.forms[ player_name ]
 
-	-- signal previous callback before formspec closure
+	-- trigger previous callback before formspec closure
 	if form then
 		minetest.get_form_timer( player_name, form.name ).stop( )
 		form.on_close( form.meta, form.player, { quit = minetest.FORMSPEC_SIGPROC } )
@@ -186,7 +216,7 @@ minetest.create_form = function ( meta, player_name, formspec, on_close )
 	form.origin = string.match( debug.getinfo( 2 ).source, "^@.*[/\\]mods[/\\](.-)[/\\]" ) or "?"
 	form.on_close = on_close
 	form.meta = meta or { }
-	form.oldtime = os.time( )
+	form.oldtime = math.floor( afs.get_uptime( ) )
 	form.newtime = form.oldtime
 
 	-- hidden elements only provide default, initial values 
@@ -216,10 +246,6 @@ minetest.create_form = function ( meta, player_name, formspec, on_close )
 	return form.name
 end
 
------------------------------------------------------------------
--- reset detached formspec
------------------------------------------------------------------
-
 minetest.update_form = function ( player, formspec )
 	local pname = type( player ) == "string" and player or player:get_player_name( )
 	local form = afs.forms[ pname ]
@@ -228,10 +254,6 @@ minetest.update_form = function ( player, formspec )
 		minetest.show_formspec( pname, form.name, formspec )
 	end
 end
-
------------------------------------------------------------------
--- close detached formspec
------------------------------------------------------------------
 
 minetest.destroy_form = function ( player )
 	local pname = type( player ) == "string" and player or player:get_player_name( )
@@ -249,7 +271,7 @@ minetest.destroy_form = function ( player )
 end
 
 -----------------------------------------------------------------
--- signal callbacks after unexpected formspec termination
+-- trigger callbacks after unexpected formspec closure
 -----------------------------------------------------------------
 
 minetest.register_on_leaveplayer( function( player, is_timeout )
@@ -294,8 +316,12 @@ minetest.register_on_shutdown( function( )
 	afs.forms = { }
 end )
 
+-----------------------------------------------------------------
+-- display realtime information about form sessions
+-----------------------------------------------------------------
+
 minetest.register_chatcommand( "fs", {
-        description = "Show realtime information about form sessions",
+        description = "Display realtime information about form sessions",
 	privs = { server = true },
         func = function( pname, param )
 		local page_idx = 1
@@ -311,13 +337,13 @@ minetest.register_chatcommand( "fs", {
 			return f
 		end
 		local get_formspec = function( )
-			local uptime = minetest.get_server_uptime( )
+			local uptime = math.floor( afs.get_uptime( ) )
 
 			local formspec = "size[9.5,7.5]"
 				.. default.gui_bg
 				.. default.gui_bg_img
 
-				.. "label[0.1,6.7;ActiveFormspecs v2.3]"
+				.. "label[0.1,6.7;ActiveFormspecs v2.4]"
 				.. string.format( "label[0.1,0.0;%s]label[0.1,0.5;%d min %02d sec]",
 					minetest.colorize( "#888888", "uptime:" ), math.floor( uptime / 60 ), uptime % 60 )
 				.. string.format( "label[5.6,0.0;%s]label[5.6,0.5;%d]",
@@ -342,8 +368,8 @@ minetest.register_chatcommand( "fs", {
 				local form = sorted_forms[ idx ]
 
 				local player_name = form.player:get_player_name( )
-				local lifetime = os.time( ) - form.oldtime
-				local idletime = os.time( ) - form.newtime
+				local lifetime = uptime - form.oldtime
+				local idletime = uptime - form.newtime
 
 				local vert = 2.0 + num * 0.5
 
