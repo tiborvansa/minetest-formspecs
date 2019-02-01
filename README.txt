@@ -1,11 +1,10 @@
-ActiveFormspecs Mod v2.4
+ActiveFormspecs Mod v2.5
 By Leslie E. Krause
 
 ActiveFormspecs is a self-contained API that provides secure session tracking, session-
-based state tables, and localized event handling of formspecs for individual mods as 
-well as entire subgames in Minetest. It evolved out of a recurring need for secure "node 
-formspecs" on my server, yet avoiding the burden of "reinventing the wheel" with every 
-new project.
+based state tables, and localized event handling of formspecs for individual mods as well
+as entire games. It evolved out of a recurring need for secure "node formspecs" on my
+server, while avoiding the burden of "reinventing the wheel" with every new project.
 
 ActiveFormspecs is intended to be compatible with all versions of Minetest 0.4.14+. 
 
@@ -64,19 +63,29 @@ Version 2.4 (12-Feb-2018)
   - various code refactoring and better comments
   - full rewrite of timer queue for higher precision
 
+Version 2.5 (01-Feb-2019)
+  - made callback function optional with default no-op
+  - added non-trappable form session termination signal
+  - properly reset timestamp for lifetime calculation
+
+Compatability
+----------------------
+
+Minetest 0.4.14+ required
+
 Installation
 ----------------------
 
-  1) Unzip the archive into the mods directory of your subgame
-  2) Rename the formspecs-master directory to "formspecs"
-  3) Add "formspecs" to the depends.txt file of mods using the ActiveFormspecs API.
+  1) Unzip the archive into the mods directory of your game.
+  2) Rename the formspecs-master directory to "formspecs".
+  3) Add "formspecs" as a dependency to any mods using the API.
 
 Source Code License
 ----------------------
 
 The MIT License (MIT)
 
-Copyright (c) 2016-2017, Leslie E. Krause
+Copyright (c) 2016-2020, Leslie E. Krause (leslie@searstower.org)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this
 software and associated documentation files (the "Software"), to deal in the Software

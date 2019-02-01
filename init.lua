@@ -1,8 +1,8 @@
 --------------------------------------------------------
--- Minetest :: ActiveFormspecs Mod v2.4 (formspecs)
+-- Minetest :: ActiveFormspecs Mod v2.5 (formspecs)
 --
 -- See README.txt for licensing and release notes.
--- Copyright (c) 2016-2018, Leslie Ellen Krause
+-- Copyright (c) 2016-2019, Leslie Ellen Krause
 --
 -- ./games/just_test_tribute/mods/formspecs/init.lua
 --------------------------------------------------------
@@ -15,6 +15,7 @@ minetest.FORMSPEC_SIGKILL = 2		-- player was killed
 minetest.FORMSPEC_SIGTERM = 3		-- server is shutting down
 minetest.FORMSPEC_SIGPROC = 4		-- procedural closure
 minetest.FORMSPEC_SIGTIME = 5		-- timeout reached
+minetest.FORMSPEC_SIGSTOP = 6		-- procedural closure (cannot be trapped)
 
 local afs = { }		-- obtain localized, protected namespace
 
@@ -89,13 +90,13 @@ end
 -----------------------------------------------------------------
 
 local on_rightclick = function( pos, node, player )
-	-- should be passing meta to on_open( ) and on_close( ) as first param?
-	-- local meta = { pos = pos, node = node }
-	local formspec = minetest.registered_nodes[ node.name ].on_open( pos, player )
+	local nodedef = minetest.registered_nodes[ node.name ]
+	local meta = nodedef.send_formspec_meta and { pos = pos, node = node } or pos
+	local formspec = nodedef.on_open( meta, player )
 
 	if formspec then
 		local player_name = player:get_player_name( )
-		minetest.create_form( pos, player_name, formspec, minetest.registered_nodes[ node.name ].on_close )
+		minetest.create_form( meta, player_name, formspec, nodedef.on_close )
 		afs.forms[ player_name ].origin = node.name
 	end
 end
@@ -189,9 +190,9 @@ end
 -- open detached formspec with session-based state table
 -----------------------------------------------------------------
 
-minetest.create_form = function ( meta, player_name, formspec, on_close )
+minetest.create_form = function ( meta, player_name, formspec, on_close, signal )
 	-- short circuit whenever required params are missing
-	if not player_name or not formspec or not on_close then return end
+	if not player_name or not formspec then return end
 
 	if type( player_name ) ~= "string" then
 		player_name = player_name:get_player_name( )
@@ -202,7 +203,9 @@ minetest.create_form = function ( meta, player_name, formspec, on_close )
 	-- trigger previous callback before formspec closure
 	if form then
 		minetest.get_form_timer( player_name, form.name ).stop( )
-		form.on_close( form.meta, form.player, { quit = minetest.FORMSPEC_SIGPROC } )
+		if signal ~= minetest.FORMSPEC_SIGSTOP then
+			form.on_close( form.meta, form.player, { quit = signal or minetest.FORMSPEC_SIGPROC } )
+		end
 		afs.stats:on_close( )
 	end
 
@@ -214,7 +217,7 @@ minetest.create_form = function ( meta, player_name, formspec, on_close )
 	form.name = minetest.get_password_hash( player_name, afs.session_seed + afs.session_id )
 	form.player = minetest.get_player_by_name( player_name )
 	form.origin = string.match( debug.getinfo( 2 ).source, "^@.*[/\\]mods[/\\](.-)[/\\]" ) or "?"
-	form.on_close = on_close
+	form.on_close = on_close or function ( ) end
 	form.meta = meta or { }
 	form.oldtime = math.floor( afs.get_uptime( ) )
 	form.newtime = form.oldtime
@@ -251,11 +254,12 @@ minetest.update_form = function ( player, formspec )
 	local form = afs.forms[ pname ]
 
 	if form then
+		form.oldtime = math.floor( afs.get_uptime( ) )
 		minetest.show_formspec( pname, form.name, formspec )
 	end
 end
 
-minetest.destroy_form = function ( player )
+minetest.destroy_form = function ( player, signal )
 	local pname = type( player ) == "string" and player or player:get_player_name( )
 	local form = afs.forms[ pname ]
 
@@ -263,7 +267,9 @@ minetest.destroy_form = function ( player )
 		minetest.close_formspec( pname, form.name )
 		minetest.get_form_timer( pname ):stop( )
 
-		form.on_close( form.meta, form.player, { quit = minetest.FORMSPEC_SIGPROC } )
+		if signal ~= minetest.FORMSPEC_SIGSTOP then
+			form.on_close( form.meta, form.player, { quit = signal or minetest.FORMSPEC_SIGPROC } )
+		end
 
 		afs.stats:on_close( )
 		afs.forms[ pname ] = nil
@@ -343,7 +349,7 @@ minetest.register_chatcommand( "fs", {
 				.. default.gui_bg
 				.. default.gui_bg_img
 
-				.. "label[0.1,6.7;ActiveFormspecs v2.4]"
+				.. "label[0.1,6.7;ActiveFormspecs v2.5"
 				.. string.format( "label[0.1,0.0;%s]label[0.1,0.5;%d min %02d sec]",
 					minetest.colorize( "#888888", "uptime:" ), math.floor( uptime / 60 ), uptime % 60 )
 				.. string.format( "label[5.6,0.0;%s]label[5.6,0.5;%d]",
