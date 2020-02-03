@@ -1,4 +1,4 @@
-ActiveFormspecs Mod v2.5
+ActiveFormspecs Mod v2.6
 By Leslie E. Krause
 
 ActiveFormspecs is a self-contained API that provides secure session tracking, session-
@@ -6,7 +6,7 @@ based state tables, and localized event handling of formspecs for individual mod
 as entire games. It evolved out of a recurring need for secure "node formspecs" on my
 server, while avoiding the burden of "reinventing the wheel" with every new project.
 
-ActiveFormspecs is intended to be compatible with all versions of Minetest 0.4.14+. 
+ActiveFormspecs is intended to be compatible with all versions of Minetest 0.4.15+.
 
 https://forum.minetest.net/viewtopic.php?f=9&t=19303
 
@@ -68,10 +68,22 @@ Version 2.5 (01-Feb-2019)
   - added non-trappable form session termination signal
   - properly reset timestamp for lifetime calculation
 
+Version 2.6 (02-Feb-2020)
+  - added callback to preset state of node formspecs
+  - removed experimental property from node definition
+  - implemented reverse-lookups for dropdown fields
+  - extended dropdown element with optional parameter
+  - added signal to suspend and restore form sessions
+  - combined element parsers into dedicated function
+  - added functions for escaping formspec strings
+  - revamped element parsers to ignore malformed tags
+  - added conditional pattern matching helper function
+  - compatability bumped to Minetest 0.4.15+
+
 Compatability
 ----------------------
 
-Minetest 0.4.14+ required
+Minetest 0.4.15+ required
 
 Installation
 ----------------------
