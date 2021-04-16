@@ -7,7 +7,7 @@
 -- ./games/just_test_tribute/mods/formspecs/init.lua
 --------------------------------------------------------
 
-print( "Loading ActiveFormspecs Mod" )
+--print( "Loading ActiveFormspecs Mod" )
 
 minetest.FORMSPEC_SIGEXIT = "true"	-- player clicked exit button or pressed esc key (boolean for backward compatibility)
 minetest.FORMSPEC_SIGQUIT = 1		-- player logged off
